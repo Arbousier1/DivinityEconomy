@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 /**
  * Console class for sending uniform messages to players and the console.
- * Supports traditional ChatColor codes and HEX colors (#RRGGBB or &#RRGGBB format).
+ * Supports traditional ChatColor codes and HEX colors (&#RRGGBB or #RRGGBB format).
  */
 public class Console extends DivinityModule {
     private static final String[] variables = {"<VERSION>"};
@@ -83,7 +83,7 @@ public class Console extends DivinityModule {
 
     /**
      * Inserts the colours into the string
-     * Supports both traditional ChatColor codes and HEX colors (#RRGGBB or &#RRGGBB)
+     * Supports both traditional ChatColor codes and HEX colors (&#RRGGBB or #RRGGBB)
      *
      * @param string - The string to insert the colours into
      * @return The string with the colours inserted
@@ -131,41 +131,6 @@ public class Console extends DivinityModule {
         }
         
         return matcher.appendTail(buffer).toString();
-    }
-
-    /**
-     * Checks if the server supports HEX colors (Minecraft 1.16+)
-     *
-     * @return true if HEX colors are supported
-     */
-    public static boolean supportsHexColors() {
-        try {
-            // ChatColor.of(Color) was added in 1.16
-            ChatColor.of(java.awt.Color.RED);
-            return true;
-        } catch (NoSuchMethodError | NoClassDefFoundError e) {
-            return false;
-        }
-    }
-
-    /**
-     * Translates a HEX color string to ChatColor (for 1.16+)
-     *
-     * @param hex - The HEX color string (e.g., "FF0000" or "#FF0000")
-     * @return The ChatColor object, or null if not supported/invalid
-     */
-    public static ChatColor fromHex(String hex) {
-        if (!supportsHexColors()) {
-            return null;
-        }
-        try {
-            if (hex.startsWith("#")) {
-                hex = hex.substring(1);
-            }
-            return ChatColor.of("#" + hex);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 
     /**
