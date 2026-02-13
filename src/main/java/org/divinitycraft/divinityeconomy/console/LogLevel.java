@@ -4,8 +4,8 @@ import org.divinitycraft.divinityeconomy.config.Setting;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.awt.Color;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -23,7 +23,7 @@ public enum LogLevel {
     private static final Pattern HEX_PATTERN = Pattern.compile("^#([A-Fa-f0-9]{6})$");
     private static final Pattern HEX_PATTERN_WITH_AMP = Pattern.compile("^&#([A-Fa-f0-9]{6})$");
 
-    private ChatColor colour;
+    private Object colour;  // Can be ChatColor or String (for hex colors)
     private final String colourOption;
 
     LogLevel(ChatColor color, String colourOption) {
@@ -53,7 +53,7 @@ public enum LogLevel {
             }
 
             try {
-                ChatColor parsedColor = parseColor(value);
+                Object parsedColor = parseColor(value);
                 if (parsedColor != null) {
                     level.setColour(parsedColor);
                 } else {
@@ -70,16 +70,16 @@ public enum LogLevel {
     }
 
     /**
-     * Parses a color string to ChatColor.
+     * Parses a color string to ChatColor or hex string.
      * Supports:
      * - Traditional ChatColor names (e.g., "RED", "GREEN", "DARK_BLUE")
      * - HEX format: #RRGGBB (e.g., "#FF0000" for red)
      * - HEX format with ampersand: &#RRGGBB (e.g., "&#FF0000" for red)
      *
      * @param value The color string to parse
-     * @return The parsed ChatColor, or null if parsing fails
+     * @return The parsed ChatColor or hex color string, or null if parsing fails
      */
-    public static ChatColor parseColor(String value) {
+    public static Object parseColor(String value) {
         if (value == null || value.isEmpty()) {
             return null;
         }
@@ -107,42 +107,66 @@ public enum LogLevel {
     }
 
     /**
-     * Parses a HEX color string to ChatColor.
-     * Requires Minecraft 1.16+ for HEX color support.
+     * Parses a HEX color string and returns either the Minecraft hex format string
+     * or a fallback ChatColor for older servers.
      *
      * @param hex The HEX color string (with or without # prefix)
-     * @return The ChatColor object, or null if not supported/invalid
+     * @return The hex color string in Minecraft format, or a fallback ChatColor
      */
-    private static ChatColor parseHexColor(String hex) {
+    private static Object parseHexColor(String hex) {
         // Ensure hex starts with #
         if (!hex.startsWith("#")) {
             hex = "#" + hex;
         }
 
+        // Validate hex format
+        if (!hex.matches("#[A-Fa-f0-9]{6}")) {
+            return null;
+        }
+
         // Check if HEX colors are supported (1.16+)
         if (!supportsHexColors()) {
-            // Fallback to closest traditional color
+            // Fallback to closest traditional color for older versions
             return getClosestChatColor(hex);
         }
 
-        try {
-            return ChatColor.of(hex);
-        } catch (IllegalArgumentException e) {
-            return null;
+        // Convert hex to Minecraft format: §x§R§R§G§G§B§B
+        return translateHexToMinecraftFormat(hex);
+    }
+
+    /**
+     * Translates a HEX color to Minecraft's internal format.
+     * Example: #FF0000 -> §x§F§F§0§0§0§0
+     *
+     * @param hex The HEX color string (must start with #)
+     * @return The Minecraft formatted color string
+     */
+    private static String translateHexToMinecraftFormat(String hex) {
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
         }
+
+        StringBuilder result = new StringBuilder("§x");
+        for (char c : hex.toCharArray()) {
+            result.append("§").append(Character.toLowerCase(c));
+        }
+        return result.toString();
     }
 
     /**
      * Checks if the server supports HEX colors (Minecraft 1.16+)
+     * Uses a safe check that doesn't rely on ChatColor.of()
      *
      * @return true if HEX colors are supported
      */
     public static boolean supportsHexColors() {
         try {
-            // ChatColor.of(Color) was added in 1.16
-            ChatColor.of(Color.RED);
+            // Try to access a method that only exists in 1.16+
+            // We use reflection to avoid compilation errors
+            Class<?> chatColorClass = ChatColor.class;
+            chatColorClass.getMethod("of", String.class);
             return true;
-        } catch (NoSuchMethodError | NoClassDefFoundError e) {
+        } catch (NoSuchMethodException | SecurityException e) {
             return false;
         }
     }
@@ -251,20 +275,26 @@ public enum LogLevel {
     }
 
     /**
-     * Gets the ChatColor for this log level.
+     * Gets the color for this log level as a string.
+     * This can be either a ChatColor toString() or a hex color code.
      *
-     * @return The ChatColor
+     * @return The color string
      */
-    public ChatColor getColour() {
-        return colour;
+    public String getColour() {
+        if (colour instanceof ChatColor) {
+            return ((ChatColor) colour).toString();
+        } else if (colour instanceof String) {
+            return (String) colour;
+        }
+        return ChatColor.WHITE.toString();
     }
 
     /**
-     * Sets the ChatColor for this log level.
+     * Sets the color for this log level.
      *
-     * @param colour The ChatColor to set
+     * @param colour The color to set (ChatColor or String for hex)
      */
-    private void setColour(ChatColor colour) {
+    private void setColour(Object colour) {
         this.colour = colour;
     }
 
