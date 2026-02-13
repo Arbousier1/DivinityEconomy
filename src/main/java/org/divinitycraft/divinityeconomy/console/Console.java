@@ -15,9 +15,12 @@ import org.bukkit.entity.Player;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Console class for sending uniform messages to players and the console.
+ * Supports traditional ChatColor codes and HEX colors (#RRGGBB or &#RRGGBB format).
  */
 public class Console extends DivinityModule {
     private static final String[] variables = {"<VERSION>"};
@@ -80,17 +83,90 @@ public class Console extends DivinityModule {
 
     /**
      * Inserts the colours into the string
+     * Supports both traditional ChatColor codes and HEX colors (#RRGGBB or &#RRGGBB)
      *
      * @param string - The string to insert the colours into
      * @return The string with the colours inserted
      */
     private static String insertColours(String string) {
+        if (string == null) {
+            return "";
+        }
+        
+        // First, handle HEX colors (for 1.16+ servers)
+        string = translateHexColors(string);
+        
+        // Then handle traditional ChatColor codes
         for (ChatColor colour : ChatColor.values()) {
             string = string.replaceAll(String.format("(&%s)|(%s)", colour.getChar(), colour.name()), colour.toString());
         }
         return string;
     }
 
+    /**
+     * Translates HEX color codes to Minecraft format
+     * Supports formats: &#RRGGBB, #RRGGBB
+     * Example: &#FF0000 or #FF0000 becomes §x§F§F§0§0§0§0 (red)
+     *
+     * @param message - The message containing HEX codes
+     * @return The message with translated HEX colors
+     */
+    private static String translateHexColors(String message) {
+        if (message == null) {
+            return null;
+        }
+        
+        // Pattern for &#RRGGBB or #RRGGBB
+        final Pattern hexPattern = Pattern.compile("&?#([A-Fa-f0-9]{6})");
+        Matcher matcher = hexPattern.matcher(message);
+        StringBuilder buffer = new StringBuilder(message.length() + 4 * 8);
+        
+        while (matcher.find()) {
+            String hex = matcher.group(1);
+            StringBuilder replacement = new StringBuilder("§x");
+            for (char c : hex.toCharArray()) {
+                replacement.append('§').append(c);
+            }
+            matcher.appendReplacement(buffer, replacement.toString());
+        }
+        
+        return matcher.appendTail(buffer).toString();
+    }
+
+    /**
+     * Checks if the server supports HEX colors (Minecraft 1.16+)
+     *
+     * @return true if HEX colors are supported
+     */
+    public static boolean supportsHexColors() {
+        try {
+            // ChatColor.of(Color) was added in 1.16
+            ChatColor.of(java.awt.Color.RED);
+            return true;
+        } catch (NoSuchMethodError | NoClassDefFoundError e) {
+            return false;
+        }
+    }
+
+    /**
+     * Translates a HEX color string to ChatColor (for 1.16+)
+     *
+     * @param hex - The HEX color string (e.g., "FF0000" or "#FF0000")
+     * @return The ChatColor object, or null if not supported/invalid
+     */
+    public static ChatColor fromHex(String hex) {
+        if (!supportsHexColors()) {
+            return null;
+        }
+        try {
+            if (hex.startsWith("#")) {
+                hex = hex.substring(1);
+            }
+            return ChatColor.of("#" + hex);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 
     /**
      * Initialisation of the object
